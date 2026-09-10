@@ -53,6 +53,15 @@ class FakeStore implements NotificationsStore {
   }
 }
 
+class ExchangingStore extends FakeStore {
+  public exchanged: string[] = [];
+
+  async exchangeDeviceToken(deviceToken: string): Promise<string> {
+    this.exchanged.push(deviceToken);
+    return `fcm:${deviceToken}`;
+  }
+}
+
 test("subscribe forwards opaque topic strings", async () => {
   const provider = new FakeProvider();
   const service = new PushService({ provider });
@@ -97,6 +106,20 @@ test("getNotifications returns the topics from the store unchanged", async () =>
   assert.deepEqual(notifications, ["news-updates", "product-alerts", "general-announcements"]);
 });
 
+test("getNotifications exchanges the device token before reading the store", async () => {
+  const store = new ExchangingStore();
+  store.topics.set("fcm:device-token", ["news-updates"]);
+  const service = new PushService({
+    provider: new FakeProvider(),
+    store
+  });
+
+  const notifications = await service.getNotifications("device-token");
+
+  assert.deepEqual(store.exchanged, ["device-token"]);
+  assert.deepEqual(notifications, ["news-updates"]);
+});
+
 test("subscribe syncs the configured store", async () => {
   const provider = new FakeProvider();
   const store = new FakeStore();
@@ -105,6 +128,23 @@ test("subscribe syncs the configured store", async () => {
   await service.subscribe("other-device", ["a", "b"]);
 
   assert.deepEqual(await store.getTopicsForDevice("other-device"), ["a", "b"]);
+});
+
+test("subscribe exchanges the device token before calling the provider and syncing the store", async () => {
+  const provider = new FakeProvider();
+  const store = new ExchangingStore();
+  const service = new PushService({ provider, store });
+
+  await service.subscribe("device-token", ["demo"]);
+
+  assert.deepEqual(store.exchanged, ["device-token"]);
+  assert.deepEqual(provider.subscribed, [
+    {
+      deviceToken: "fcm:device-token",
+      topicNames: ["demo"]
+    }
+  ]);
+  assert.deepEqual(await store.getTopicsForDevice("fcm:device-token"), ["demo"]);
 });
 
 test("unsubscribe syncs the configured store", async () => {
@@ -117,9 +157,28 @@ test("unsubscribe syncs the configured store", async () => {
   assert.deepEqual(await store.getTopicsForDevice("device-token"), ["news-updates", "general-announcements"]);
 });
 
+test("unsubscribe exchanges the device token before calling the provider and syncing the store", async () => {
+  const provider = new FakeProvider();
+  const store = new ExchangingStore();
+  store.topics.set("fcm:device-token", ["news-updates", "product-alerts"]);
+  const service = new PushService({ provider, store });
+
+  await service.unsubscribe("device-token", ["product-alerts"]);
+
+  assert.deepEqual(store.exchanged, ["device-token"]);
+  assert.deepEqual(provider.unsubscribed, [
+    {
+      deviceToken: "fcm:device-token",
+      topicNames: ["product-alerts"]
+    }
+  ]);
+  assert.deepEqual(await store.getTopicsForDevice("fcm:device-token"), ["news-updates"]);
+});
+
 test("subscribe skips store sync when the store is read-only", async () => {
   const provider = new FakeProvider();
   const store = new LegacyFirebaseMessagingStore({
+    appId: "app-id",
     getAccessToken: async () => "token",
     fetch: async () =>
       new Response(JSON.stringify({ rel: { topics: { "/topics/demo": {} } } }), {
@@ -134,6 +193,7 @@ test("subscribe skips store sync when the store is read-only", async () => {
 
 test("LegacyFirebaseMessagingStore reads topics from the IID info endpoint", async () => {
   const store = new LegacyFirebaseMessagingStore({
+    appId: "app-id",
     getAccessToken: async () => "token",
     fetch: async (input, init) => {
       assert.equal(String(input), "https://iid.googleapis.com/iid/info/device-token?details=true");
@@ -166,6 +226,7 @@ test("LegacyFirebaseMessagingStore reads topics from the IID info endpoint", asy
 test("LegacyFirebaseMessagingStore preserves raw FCM token characters in the IID path", async () => {
   const deviceToken = "dObkozJYTGmR4tepBDBFZq:APA91bETmo0B2flzjge_dja6SGVqTAQbqDKfcbFBpejwndY5VBIbiyJX_1ZWsO5PIQOPLEA7BEuMFyR8DwYJ0jTDBgM5K3HK2PGf7_BBU96gLvkLSXqJGi0";
   const store = new LegacyFirebaseMessagingStore({
+    appId: "app-id",
     getAccessToken: async () => "token",
     fetch: async (input) => {
       assert.equal(

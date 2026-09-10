@@ -1,15 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FirebaseAdminPushProvider, InvalidTopicError } from "../src/index.js";
-import type { Messaging } from "firebase-admin/messaging";
+import { type Messaging, type MessagingTopicManagementResponse, FirebaseMessagingError } from "firebase-admin/messaging";
 
-function createTopicManagementResponse(successCount: number, failureCount: number, messages: string[] = []) {
+function createTopicManagementResponse(successCount: number, failureCount: number, messages: string[] = []): MessagingTopicManagementResponse {
   return {
     successCount,
     failureCount,
     errors: messages.map((message, index) => ({
       index,
-      error: new Error(message)
+      error: new Error(message) as FirebaseMessagingError
     }))
   };
 }
@@ -96,21 +96,14 @@ test("FirebaseAdminPushProvider sends topic messages with notification and data 
     },
     data: {
       key: "value",
-      deepLink: "my-app://news/1"
-    },
-    android: {
-      data: {
-        deepLink: "my-app://news/1"
-      }
+      deepLink: "my-app://news/1",
+      url: "my-app://news/1"
     },
     apns: {
       payload: {
         aps: {
           sound: "default"
         }
-      },
-      fcmOptions: {
-        analyticsLabel: "push-service"
       }
     }
   });
@@ -138,7 +131,6 @@ test("FirebaseAdminPushProvider sends condition messages", async () => {
       body: "World"
     },
     data: undefined,
-    android: undefined,
     apns: undefined
   });
 });

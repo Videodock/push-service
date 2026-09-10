@@ -20,16 +20,19 @@ export class PushService {
       );
     }
 
-    return this.options.store.getTopicsForDevice(deviceToken);
+    const resolvedDeviceToken = await this.resolveDeviceToken(deviceToken);
+
+    return this.options.store.getTopicsForDevice(resolvedDeviceToken);
   }
 
   async subscribe(deviceToken: string, topics: string | string[]): Promise<TopicManagementResult> {
     assertDeviceToken(deviceToken);
     const topicNames = normalizeTopics(topics);
-    const result = await this.options.provider.subscribeToTopics(deviceToken, topicNames);
+    const resolvedDeviceToken = await this.resolveDeviceToken(deviceToken);
+    const result = await this.options.provider.subscribeToTopics(resolvedDeviceToken, topicNames);
 
     if (this.options.store?.addTopicsForDevice) {
-      await this.options.store.addTopicsForDevice(deviceToken, topicNames);
+      await this.options.store.addTopicsForDevice(resolvedDeviceToken, topicNames);
     }
 
     return result;
@@ -38,10 +41,11 @@ export class PushService {
   async unsubscribe(deviceToken: string, topics: string | string[]): Promise<TopicManagementResult> {
     assertDeviceToken(deviceToken);
     const topicNames = normalizeTopics(topics);
-    const result = await this.options.provider.unsubscribeFromTopics(deviceToken, topicNames);
+    const resolvedDeviceToken = await this.resolveDeviceToken(deviceToken);
+    const result = await this.options.provider.unsubscribeFromTopics(resolvedDeviceToken, topicNames);
 
     if (this.options.store?.removeTopicsForDevice) {
-      await this.options.store.removeTopicsForDevice(deviceToken, topicNames);
+      await this.options.store.removeTopicsForDevice(resolvedDeviceToken, topicNames);
     }
 
     return result;
@@ -66,6 +70,14 @@ export class PushService {
         })
       )
     );
+  }
+
+  private async resolveDeviceToken(deviceToken: string): Promise<string> {
+    if (!this.options.store?.exchangeDeviceToken) {
+      return deviceToken;
+    }
+
+    return await this.options.store.exchangeDeviceToken(deviceToken);
   }
 }
 

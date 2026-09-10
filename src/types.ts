@@ -43,10 +43,13 @@ export interface NotificationsStore {
   getTopicsForDevice(deviceToken: string): Promise<string[]>;
   addTopicsForDevice?(deviceToken: string, topicNames: string[]): Promise<void>;
   removeTopicsForDevice?(deviceToken: string, topicNames: string[]): Promise<void>;
+  exchangeDeviceToken?(deviceToken: string): Promise<string>;
 }
 
 export interface LegacyFirebaseMessagingStoreOptions {
   getAccessToken: () => Promise<string>;
+  appId: string;
+  sandbox: boolean;
   endpoint?: string;
   fetch?: typeof fetch;
 }
