@@ -61,7 +61,7 @@ export class FirebaseAdminPushProvider implements PushProvider {
 function createBaseMessage(message: PushMessageInput): Omit<Message, "topic" | "condition"> {
   const data = {
     ...(message.data ?? {}),
-    ...(message.deepLink ? { deepLink: message.deepLink } : {})
+    ...(message.deepLink ? { deepLink: message.deepLink, url: message.deepLink } : {})
   };
 
   return {
@@ -73,20 +73,12 @@ function createBaseMessage(message: PushMessageInput): Omit<Message, "topic" | "
         }
       : undefined,
     data: Object.keys(data).length > 0 ? data : undefined,
-    android: message.deepLink
-      ? {
-          data: { deepLink: message.deepLink }
-        }
-      : undefined,
     apns: message.deepLink
       ? {
           payload: {
             aps: {
               sound: "default"
             }
-          },
-          fcmOptions: {
-            analyticsLabel: "push-service"
           }
         }
       : undefined
